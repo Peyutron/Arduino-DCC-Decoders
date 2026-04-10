@@ -3,18 +3,24 @@ void Funciones() {
 
   ///////////////////////////////////////////////////////////////////////////
   // Rele corazon desvio
-  if (acc[DESVIO_COCHERAS].output) {
-    Serial.println("funcion");
+  if (acc[DESVIO_COCHERAS].output ==  1 && !desvio_cocheras_flag) {
+    delay(1000);
     digitalWrite(acc[DESVIO_COCHERAS].outputPin0, HIGH);
-  } else {
+    desvio_cocheras_flag =true; 
+  }
+  if (acc[DESVIO_COCHERAS].output ==  0 && desvio_cocheras_flag) {
+    delay(1000);
     digitalWrite(acc[DESVIO_COCHERAS].outputPin0, LOW);
+    desvio_cocheras_flag = false;
   }
 
   ///////////////////////////////////////////////////////////////////////
   // Establece la salida para las luces exteriores
-  if (acc[ACC_LUCES_EXTERIOR].output) {
+  if (acc[ACC_LUCES_EXTERIOR].output) 
+  {
     luces_exteriores();
-  } else {
+  } else 
+  {
     funcion_luces_inicio = true;       // Secuencia encendido 1/3
     funcion_luces_progresivo = false;  // Secuencia progresiva 2/3
     funcion_luces_encendidas = false;  // Secuencia encendido 3/3
@@ -28,10 +34,13 @@ void Funciones() {
 
   ///////////////////////////////////////////////////////////////////////
   // Establece la salida semaforo principal
-  if (acc[DESVIO_PRINCIPAL].output) {
+  if (acc[DESVIO_PRINCIPAL].output)
+  {
     digitalWrite(acc[DESVIO_PRINCIPAL].outputPin0, HIGH);
     digitalWrite(acc[DESVIO_PRINCIPAL].outputPin1, LOW);
-  } else {
+  } 
+  else
+  {
     digitalWrite(acc[DESVIO_PRINCIPAL].outputPin0, LOW);
     digitalWrite(acc[DESVIO_PRINCIPAL].outputPin1, HIGH);
   }
@@ -42,9 +51,11 @@ void Funciones() {
   else digitalWrite(acc[ACC_SOLDADOR].outputPin0, LOW);
 }
 
-void luces_exteriores() {
+void luces_exteriores() 
+{
   // Inicia la animación encendiendo y apagando las luces
-  if (funcion_luces_inicio) {
+  if (funcion_luces_inicio) 
+  { 
     bool status = true;
     for (int repeticion = 0; repeticion < 3; repeticion++) {
       analogWrite(acc[ACC_LUCES_EXTERIOR].outputPin0, 80);  // PWM
@@ -57,12 +68,15 @@ void luces_exteriores() {
   }  // FIN primera parte encendido
 
   // Segunda parte animación encendido progresivo
-  if (funcion_luces_progresivo) {
+  if (funcion_luces_progresivo) 
+  {
     unsigned long currentMillisLuces = millis();
-    if (currentMillisLuces - previousMillisLuces >= periodoLuces) {
+    if (currentMillisLuces - previousMillisLuces >= periodoLuces) 
+    {
       encendidoLuces++;
       analogWrite(acc[ACC_LUCES_EXTERIOR].outputPin0, encendidoLuces);
-      if (encendidoLuces == final_luces_pwm) {
+      if (encendidoLuces == final_luces_pwm) 
+      {
         Serial.println(F("FINAL LUCES"));
         encendidoLuces = inicia_luces_pwm;
         funcion_luces_progresivo = false;
@@ -76,12 +90,13 @@ void luces_exteriores() {
   if (funcion_luces_encendidas) analogWrite(acc[ACC_LUCES_EXTERIOR].outputPin0, final_luces_pwm);
 }
 
-void accesorioSoldador() {
+void accesorioSoldador() 
+{
 
   unsigned long S1currentMillis = millis();
   if (estadoSoldador0) {
-    //unsigned long S2currentMillis = millis();
-    if (S1currentMillis - S1previousMillis > S1Interval) {
+    if (S1currentMillis - S1previousMillis > S1Interval) 
+    {
       S1previousMillis = S1currentMillis;
       if (!estadoSoldador1)
         digitalWrite(acc[ACC_SOLDADOR].outputPin0, LOW);
@@ -91,11 +106,15 @@ void accesorioSoldador() {
       S1Interval = random(duracionFlashMin, duracionFlashMax);
     }
   }
-  if (S1currentMillis - S2previousMillis > S2Interval) {
+  if (S1currentMillis - S2previousMillis > S2Interval) 
+  {
     S2previousMillis = S1currentMillis;
-    if (!estadoSoldador0) {
+    if (!estadoSoldador0) 
+    {
       estadoSoldador0 = true;
-    } else {
+    }
+    else
+    {
       estadoSoldador0 = false;
       digitalWrite(acc[ACC_SOLDADOR].outputPin0, LOW);
     }

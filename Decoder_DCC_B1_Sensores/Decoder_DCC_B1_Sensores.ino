@@ -2,9 +2,9 @@
 
   # Desvio 1   Entrada cocheras    Dir=  5;  Subdir= 0;  F=1;
   --------------------------------------------------------
-  # Animacion soldador             Dir=  1;  Subdir= 1;  F=2;
-  # Luces Exteriores               Dir=  1;  Subdir= 2;  F=3;
-  # Luces Casas                    Dir=  1;  Subdir= 3;  F=4;
+  # Animacion soldador             Dir=  2;  Subdir= 1;  F=2;
+  # Luces Exteriores               Dir=  1;  Subdir= 1;  F=3;
+  # Luces Casas                    Dir=  1;  Subdir= 2;  F=4;
   # Semáforo Desvío principal      Dir=  5;  Subdir= 1;  F=18;
   --------------------------------------------------------
   Descipción: 
@@ -23,10 +23,10 @@
   D7 = Pin Tx RF433  vw_tx_pin = 7 (módulo FS1000A)
   D8 = Luz semáforo - rojo
   D9 = Luz semáforo - verde
-  D10 =
+  D10 = Rele corazón desvío cocheras
   D11 = Relé Bucle de retorno
   D12 = Soldador
-  D13 = Rele corazón desvío cocheras
+  D13 = 
   A0 = Sensor Bloque 1 E/S Sur SENS03
   A1 = Sensor Bloque 2 Interior bucle SENS04
   A2 = Sensor Bloque 3 E/S Norte SENS05
@@ -42,20 +42,16 @@
 
 // definimos los pines
 //////////////////////
-#define SENSOR_IR_A 3  // pin Modulo Ir A Sur
-#define SENSOR_IR_B 4  // pin Modulo Ir B Norte
+// #define SENSOR_IR_A 3  // pin Modulo Ir A Sur
+// #define SENSOR_IR_B 4  // pin Modulo Ir B Norte
 #define P_FAROLAS 5    // Luces Farolas (PWM)
 #define P_CASAS 6      // Luces interior casas (PWM)
 // #define RF_TX_PIN      7   // Pin Tx RF433  vw_tx_pin = 7
 #define SEM_PRIN_VERDE 8  // Led semáforo verde
 #define SEM_PRIN_ROJO 9   // Led semáforo verde
+#define RELECORAZON 10    // Rele corazón desvío cocheras
 #define RELELOOP 11       // pin Rele
 #define SOLDADOR 12       // Efecto soldador
-#define RELECORAZON 13    // Rele corazón desvío cocheras
-#define BLOQUE1PIN A0     // SENS03
-#define BLOQUE2PIN A1     // SENS04
-#define BLOQUE3PIN A2     // SENS05
-#define BLOQUE4PIN A3     // No usado
 
 // Número indice accItem (acc)
 #define ACC_LUCES_EXTERIOR 0
@@ -63,8 +59,8 @@
 #define ACC_SOLDADOR 2
 #define DESVIO_PRINCIPAL 3  // Semaforo
 #define DESVIO_COCHERAS 4   // Rele corazón desvío
+
 // Número de accesorios
-///////////////////////
 #define MAX_ACC 5
 
 ////////////////////////////////
@@ -73,6 +69,7 @@ bool funcion_luces_inicio = true;
 bool funcion_luces_progresivo = false;
 bool funcion_luces_encendidas = false;
 
+bool desvio_cocheras_flag = false;
 const uint8_t inicia_luces_pwm = 10;  // Intensidad inicial de las luces
 const uint8_t final_luces_pwm = 110;  // Intensidad final de las luces
 const uint8_t activa_luces_pwm = 200;
@@ -98,52 +95,94 @@ boolean estadoSoldador1 = true;
 ///////////////////////////////
 // Timer Sensores
 unsigned long previousMillisSensores = 0;
-const long intervalSensores = 150;  // Tiempo para checheo de sensores (millisegundos)
-bool bloque[8] = { false, false, false, false, false, false, false, false };
+const long intervalSensores = 50;  // Tiempo para checheo de sensores (millisegundos)
+#define MAX_SENSORES 6
 
-bool BloqueStatus[8] = { false, false, false, false, false, false, false, false };
+struct Sensores {
+  uint8_t id;
+  uint8_t pin;
+  bool estado;
+  bool old_estado;
+};
+Sensores sensor[MAX_SENSORES];
+
+void ConfigureSensors()
+{
+  sensor[0].id = 1;
+  sensor[0].pin = A0;
+  sensor[0].estado = false;
+  sensor[0].old_estado = false;
+
+  sensor[1].id = 2;
+  sensor[1].pin = A1;
+  sensor[1].estado = false;
+  sensor[1].old_estado = false;
+
+  sensor[2].id = 3;
+  sensor[2].pin = A2;
+  sensor[2].estado = false;
+  sensor[2].old_estado = false;
+
+  sensor[3].id = 4;
+  sensor[3].pin = A3;
+  sensor[3].estado = false;
+  sensor[3].old_estado = false;
+  
+  sensor[4].id = 5;
+  sensor[4].pin = 3;
+  sensor[4].estado = false;
+  sensor[4].old_estado = false;
+
+  sensor[5].id = 6;
+  sensor[5].pin = 4;
+  sensor[5].estado = false;
+  sensor[5].old_estado = false;
+
+}
 bool statusrelay = true;
 
 struct accItem {
-  int direccion;    // DCC address to respond to
-  boolean output;   // State of DCC accessory: 1=on, 0=off (ECoS: on=straight, off=turnout)
-  byte outputPin0;  // Arduino output pin for additional function (not where servo is attached to)
-  byte outputPin1;  // Arduino output pin for additional function (not where servo is attached to)
+  int direccion;    // Dirección de respuesta DCC
+  boolean output;   // Estado del accesorio: 1=on, 0=off (ECoS: on=recto, off=desviado)
+  byte outputPin0;  // Pin de salida Arduino para una función adicional (No usar con servo)
+  byte outputPin1;  // Pin de salida Arduino para una función adicional (No usar con servo)
 };
 accItem acc[MAX_ACC];
 
 //////////////////////////////////////////////////////////////
 // Configuración de funciones del decodificador
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void ConfigureFunctionsAndServos() {
+void ConfigureFunctionsAndServos() 
+{
   //////////////////////
-  acc[ACC_LUCES_EXTERIOR].direccion = LUCES_EXTERIORES;  // Direccion 2 Luces Farolas. Dir 1 Sdir 1
-  acc[ACC_LUCES_EXTERIOR].outputPin0 = P_FAROLAS;        // Pin 5 Luces farolas
-  acc[ACC_LUCES_EXTERIOR].output = false;                // Estado inicial
+  acc[ACC_LUCES_EXTERIOR].direccion = LUCES_EXTERIORES; // Direccion 2 Luces Farolas. Dir 1 Sdir 1
+  acc[ACC_LUCES_EXTERIOR].outputPin0 = P_FAROLAS;       // Pin 5 Luces farolas
+  acc[ACC_LUCES_EXTERIOR].output = false;               // Estado inicial
   //////////////////////
-  acc[ACC_LUCES_INTERIOR].direccion = LUCES_CASAS;  // Direccion 3 Luces Interiores. Dir 1 Sdir 2
-  acc[ACC_LUCES_INTERIOR].outputPin0 = P_CASAS;     // Pin 6 Luces Interiores
-  acc[ACC_LUCES_INTERIOR].output = false;           // Estado inicial
+  acc[ACC_LUCES_INTERIOR].direccion = LUCES_CASAS;      // Direccion 3 Luces Interiores. Dir 1 Sdir 2
+  acc[ACC_LUCES_INTERIOR].outputPin0 = P_CASAS;         // Pin 6 Luces Interiores
+  acc[ACC_LUCES_INTERIOR].output = false;               // Estado inicial
   /////////////////////
-  acc[ACC_SOLDADOR].direccion = EF_SOLDADOR_B1;  // Direccion 6; Dir 1 Sdir 1
-  acc[ACC_SOLDADOR].outputPin0 = SOLDADOR;       // Pin 12 funcion soldador
-  acc[ACC_SOLDADOR].output = false;              // Estado inicial
+  acc[ACC_SOLDADOR].direccion = EF_SOLDADOR_B1;         // Direccion 6; Dir 2 Sdir 1
+  acc[ACC_SOLDADOR].outputPin0 = SOLDADOR;              // Pin 12 funcion soldador
+  acc[ACC_SOLDADOR].output = false;                     // Estado inicial
   /////////////////////
-  acc[DESVIO_PRINCIPAL].direccion = B1_PRINCIPAL;     // Direccion 17; Desvio Norte-este taller 2 ; Dir 6 Sdir 0
-  acc[DESVIO_PRINCIPAL].outputPin0 = SEM_PRIN_VERDE;  // Pin 8 semáforo verde
-  acc[DESVIO_PRINCIPAL].outputPin1 = SEM_PRIN_ROJO;   // Pin 9 semáforo rojo
-  acc[DESVIO_PRINCIPAL].output = false;               // Estado inicial
+  acc[DESVIO_PRINCIPAL].direccion = B1_PRINCIPAL;       // Direccion 17; Desvio Norte-este taller 2 ; Dir 5 Sdir 0
+  acc[DESVIO_PRINCIPAL].outputPin0 = SEM_PRIN_VERDE;    // Pin 8 semáforo verde
+  acc[DESVIO_PRINCIPAL].outputPin1 = SEM_PRIN_ROJO;     // Pin 9 semáforo rojo
+  acc[DESVIO_PRINCIPAL].output = false;                 // Estado inicial
   /////////////////////
-  acc[DESVIO_COCHERAS].direccion = B1_COCHERAS;   // Direccion 17; Desvio Norte-este taller 2 ; Dir 6 Sdir 0
-  acc[DESVIO_COCHERAS].outputPin0 = RELECORAZON;  // Pin 13 Relé corazon desvío
-  acc[DESVIO_COCHERAS].output = false;            // Estado inicial
+  acc[DESVIO_COCHERAS].direccion = B1_COCHERAS;         // Direccion 18; Desvio Norte-este taller 2 ; Dir 5 Sdir 1
+  acc[DESVIO_COCHERAS].outputPin0 = RELECORAZON;        // Pin 10 Relé corazon desvío
+  acc[DESVIO_COCHERAS].output = false;                   // Estado inicial
 
 }  // END ConfigureFunctionsAndServos()
 
 /////////////////////////////////////////
 // DCC packet handler Gestión de paquetes
 /////////////////////////////////////////
-void BasicAccDecoderPacket_Handler(int address, boolean activate, byte data) {
+void BasicAccDecoderPacket_Handler(int address, boolean activate, byte data)
+{
   // conversión de direcciones NMRA a un formato humano
   address -= 1;
   address *= 4;
@@ -157,7 +196,7 @@ void BasicAccDecoderPacket_Handler(int address, boolean activate, byte data) {
     if (address == acc[i].direccion) {
       if (enable) acc[i].output = true;
       else acc[i].output = false;
-      mensaje(i);  // DEBUG ONLY
+      // printMessage(i);  // DEBUG ONLY
       break;
     }
   }
@@ -165,17 +204,20 @@ void BasicAccDecoderPacket_Handler(int address, boolean activate, byte data) {
 
 ///////////////////////////////
 // Setup (se ejecuta al inicio)
-///////////////////////////////
-void setup() {
+void setup() 
+{
   delay(1000);
   Serial.begin(115200);
-  Serial.println(F("DECODER 1_0"));
+  Serial.println(F("DECODER 1_0 Sensores"));
 
   DCC.SetBasicAccessoryDecoderPacketHandler(BasicAccDecoderPacket_Handler, true);
 
   ConfigureFunctionsAndServos();
+  ConfigureSensors();
 
-  for (int i = 0; i < MAX_ACC; i++) {
+
+  for (int i = 0; i < MAX_ACC; i++) 
+  {
     pinMode(acc[i].outputPin0, OUTPUT);
     pinMode(acc[i].outputPin1, OUTPUT);
 
@@ -190,13 +232,12 @@ void setup() {
   pinMode(2, INPUT_PULLUP);  //Interrupt 0 with internal pull up resistor (can get rid of external 10k)
 
   // Pines de entrada
-  pinMode(SENSOR_IR_A, INPUT_PULLUP);
-  pinMode(SENSOR_IR_B, INPUT_PULLUP);
-  pinMode(BLOQUE1PIN, INPUT_PULLUP);
-  pinMode(BLOQUE2PIN, INPUT_PULLUP);
-  pinMode(BLOQUE3PIN, INPUT_PULLUP);
-  pinMode(BLOQUE4PIN, INPUT_PULLUP);
-
+  for (int Nsensor = 0; Nsensor < MAX_SENSORES; Nsensor++) 
+  {
+    Serial.println(Nsensor);
+    pinMode(sensor[Nsensor].pin, INPUT_PULLUP);
+  }
+  
   // Pines de salida
   pinMode(RELELOOP, OUTPUT);
   pinMode(RELECORAZON, OUTPUT);
@@ -204,42 +245,24 @@ void setup() {
   digitalWrite(RELECORAZON, LOW);
 
   // Setup RF433 FS1000A
-  vw_set_ptt_inverted(true);  // Required for DR3100 RF433
-  vw_setup(2000);             // Bits per sec
+  vw_set_ptt_inverted(true);  // Requerido para FS1000A y DR3100 RF433
+  vw_setup(2000);             // Bits por seg
 }
 
 ////////////////////////////////////////////
 // loop principal (se ejecuta continuamente)
 ////////////////////////////////////////////
-void loop() {
-
-  DCC.loop();   // DCC library
-  Funciones();  // Funciones.ino
-
+void loop()
+{
+  DCC.loop();
   // Temporizador para la detección de sensores
   unsigned long currentMillisSensores = millis();
-  if (currentMillisSensores - previousMillisSensores >= intervalSensores) {
+  if (currentMillisSensores - previousMillisSensores >= intervalSensores) 
+  {
     previousMillisSensores = currentMillisSensores;
     Ocupacion();  // Deteccion.ino
   }
+  Funciones();  // Funciones.ino
 }  // Fin del loop
 
 
-void mensaje(int option) {
-  String msg = "";
-  switch (option) {
-    case ACC_LUCES_EXTERIOR:
-      if (acc[ACC_LUCES_EXTERIOR].output) msg = "*-Luces Exteriores ON";
-      else msg = "*-Luces Exteriores OFF";
-      break;
-    case ACC_LUCES_INTERIOR:
-      if (acc[ACC_LUCES_INTERIOR].output) msg = "*-Luces interiores ON";
-      else msg = "*-Luces interiores OFF";
-      break;
-    case ACC_SOLDADOR:
-      if (acc[ACC_SOLDADOR].output) msg = "*-Accesorio Soldador ON";
-      else msg = "*-Accesorio Soldador OFF";
-      break;
-  }
-  Serial.println(msg);
-}
