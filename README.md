@@ -1,12 +1,12 @@
 Estos son los Decodificadore DCC que utilizo en la http://lamaquetade.infotronikblog.com 
 
 * Decoder_DCC_B1_Barriada:
-  Distribucion de pines:
-  D02 = Entrada DCC
-  D03 = Luces farolas (PWM)
-  D04 = HOME 1 ROOM 1
-  D05 = HOME 1 ROOM 2
-  D06 = HOME 2 ROOM 1
+   - Distribucion de pines:
+   - D02 = Entrada DCC
+   - D03 = Luces farolas (PWM)
+   - D04 = HOME 1 ROOM 1
+   - D05 = HOME 1 ROOM 2
+   - D06 = HOME 2 ROOM 1
   D07 = HOME 2 ROOM 2
   D08 = HOME_3 ROOM 1
   D09 = HOME 3 ROOM 2
